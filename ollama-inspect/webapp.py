@@ -286,7 +286,7 @@ def create_app() -> Flask:
         if not filename:
             # Render a simple error page when filename is missing
             return render_template(
-                "index.html",
+                "model_metadata.html",
                 model_path=str(blobs_root),
                 items=[],
                 keys_count=0,
@@ -296,7 +296,7 @@ def create_app() -> Flask:
         fn = normalize_candidate_filename(filename)
         if not fn.startswith("sha256-"):
             return render_template(
-                "index.html",
+                "model_metadata.html",
                 model_path=str(blobs_root / fn),
                 items=[],
                 keys_count=0,
@@ -305,7 +305,7 @@ def create_app() -> Flask:
         # Security: disallow path traversal
         if not is_valid_blob_filename(fn):
             return render_template(
-                "index.html",
+                "model_metadata.html",
                 model_path=str(blobs_root / fn),
                 items=[],
                 keys_count=0,
@@ -320,7 +320,7 @@ def create_app() -> Flask:
         except Exception as e:
             # Render a simple error page
             return render_template(
-                "index.html",
+                "model_metadata.html",
                 model_path=model_path,
                 items=[],
                 keys_count=0,
@@ -337,7 +337,7 @@ def create_app() -> Flask:
             items.append((k, preview, full_json, truncated))
 
         return render_template(
-            "index.html",
+            "model_metadata.html",
             model_path=model_path,
             items=items,
             keys_count=len(kv),

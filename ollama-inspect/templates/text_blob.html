@@ -22,7 +22,6 @@
         <h1 class="h3 mb-2">{{ title }}</h1>
         <div class="text-muted small mb-2">
           File: <code>{{ model_path }}</code>
-          {% if filename %}· blob=<code>{{ filename }}</code>{% endif %}
         </div>
         {% if error %}
           <div class="alert alert-warning" role="alert">{{ error }}</div>

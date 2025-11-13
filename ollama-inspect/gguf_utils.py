@@ -168,6 +168,8 @@ def extract_all(model_path: Path) -> Tuple[List[str], Dict[str, Any]]:
                 if len(field.data) > 6:
                     content = content[:-1] + ', ...]'
                 log_message += ' = {0}'.format(content)
+        print(log_message)  # noqa: NP100
+        
         # Populate items dict with full, properly typed values (not truncated like the log)
         try:
             if field.types:
@@ -190,6 +192,5 @@ def extract_all(model_path: Path) -> Tuple[List[str], Dict[str, Any]]:
 
         items[str(field.name)] = _coerce_to_python(value)
 
-        print(log_message)  # noqa: NP100
 
     return items

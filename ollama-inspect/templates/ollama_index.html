@@ -54,16 +54,16 @@
                     {% if e.model_blob_filename %}
                       <span class="text-decoration-none">{{ e.name }}</span>
                       <div class="small text-muted">
-                        <a class="link-secondary" href="/model/metadata?filename={{ e.model_blob_filename }}">Model Metadata</a>
+                        <a class="link-secondary" target="_blank" href="/model/metadata?filename={{ e.model_blob_filename }}">Model Metadata</a>
                         {% if e.template_blob_filename or e.license_blob_filename %}
                           |
                           {% if e.template_blob_filename %}
-                            <a class="link-secondary" href="/model/template?filename={{ e.template_blob_filename }}">Template</a>
+                            <a class="link-secondary" target="_blank" href="/model/template?filename={{ e.template_blob_filename }}">Template</a>
                           {% endif %}
                           {% if e.license_blob_filename %}
                             {% if e.template_blob_filename %}|
                             {% endif %}
-                            <a class="link-secondary" href="/model/license?filename={{ e.license_blob_filename }}">License</a>
+                            <a class="link-secondary" target="_blank" href="/model/license?filename={{ e.license_blob_filename }}">License</a>
                           {% endif %}
                         {% endif %}
                       </div>
