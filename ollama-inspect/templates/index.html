@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>GGUF Keys – Ollama Inspect</title>
+    <title>GGUF Keys & Values – Ollama Inspect</title>
     <style>
       :root { color-scheme: light dark; }
       body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; margin: 2rem; }
@@ -12,23 +12,38 @@
       #search { padding: 0.5rem; width: min(640px, 90vw); }
       .meta { color: #888; margin: 0.25rem 0 1rem; }
       ul { list-style: none; padding: 0; }
-      li { padding: 0.25rem 0; border-bottom: 1px solid rgba(127,127,127,0.2); }
+      li { padding: 0.5rem 0; border-bottom: 1px solid rgba(127,127,127,0.2); }
+      .row { display: grid; grid-template-columns: 28% 72%; gap: 1rem; align-items: start; }
+      .k { white-space: pre-wrap; word-break: break-word; }
+      .v { white-space: pre-wrap; word-break: break-word; }
+      .preview { color: #555; }
+      .actions { margin-top: 0.25rem; }
+      button { font: inherit; padding: 0.1rem 0.4rem; }
       .hidden { display: none; }
     </style>
   </head>
   <body>
     <header>
-      <h1>GGUF Keys</h1>
+      <h1>GGUF Keys & Values</h1>
       <div class="meta">
         File: <code>{{ model_path }}</code> · Total keys: <strong id="count">{{ keys_count }}</strong>
-        · <a href="/api/keys" target="_blank" rel="noopener">JSON</a>
+        · <a href="/api/items" target="_blank" rel="noopener">JSON</a>
       </div>
-      <input id="search" type="search" placeholder="Filter keys... (type to filter)" autofocus />
+      <input id="search" type="search" placeholder="Filter keys or values... (type to filter)" autofocus />
     </header>
 
     <ul id="keys">
-      {% for k in keys %}
-        <li class="key-item"><code>{{ k }}</code></li>
+      {% for k, preview, full in items %}
+        <li class="key-item">
+          <div class="row">
+            <div class="k"><code>{{ k }}</code></div>
+            <div class="v">
+              <div class="preview">{{ preview }}</div>
+              <div class="full hidden"><pre>{{ full }}</pre></div>
+              <div class="actions"><button class="toggle">Expand</button></div>
+            </div>
+          </div>
+        </li>
       {% endfor %}
     </ul>
 
@@ -48,6 +63,26 @@
         count.textContent = visible;
       }
       search.addEventListener('input', applyFilter);
+
+      // Expand/collapse per item
+      for (const li of items) {
+        const btn = li.querySelector('button.toggle');
+        const full = li.querySelector('.full');
+        const preview = li.querySelector('.preview');
+        if (!btn || !full || !preview) continue;
+        btn.addEventListener('click', () => {
+          const isHidden = full.classList.contains('hidden');
+          if (isHidden) {
+            full.classList.remove('hidden');
+            preview.classList.add('hidden');
+            btn.textContent = 'Collapse';
+          } else {
+            full.classList.add('hidden');
+            preview.classList.remove('hidden');
+            btn.textContent = 'Expand';
+          }
+        });
+      }
     </script>
   </body>
   </html>

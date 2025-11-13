@@ -3,7 +3,7 @@
 Ollama Inspect — minimal GGUF inspector web server.
 
 Usage:
-  python main.py /path/to/your_model.gguf [--host 127.0.0.1] [--port 5000]
+  python main.py /path/to/your_model.gguf [--host 127.0.0.1] [--port 13655]
 
 Starts a local web server that displays the keys extracted from the GGUF file.
 """
@@ -17,7 +17,7 @@ def _parse_args(argv: list[str]) -> tuple[Optional[Path], str, int]:
     """Parse CLI args. Returns (model_path, host, port)."""
     model_path: Optional[Path] = None
     host = "127.0.0.1"
-    port = 5000
+    port = 13655
 
     args = list(argv[1:])
     if args and not args[0].startswith("--"):
@@ -49,7 +49,7 @@ def main(argv: list[str]) -> int:
     model_path, host, port = _parse_args(argv)
 
     if model_path is None:
-        print("Usage: python main.py /path/to/your_model.gguf [--host 127.0.0.1] [--port 5000]")
+        print("Usage: python main.py /path/to/your_model.gguf [--host 127.0.0.1] [--port 13655]")
         return 2
 
     if not model_path.exists():
