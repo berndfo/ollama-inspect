@@ -26,8 +26,16 @@
         <div class="text-muted small mb-3">
           File: <code>{{ model_path }}</code>
           · Total keys: <span class="badge text-bg-secondary" id="count">{{ keys_count }}</span>
-          · <a class="link-secondary" href="/api/items" target="_blank" rel="noopener">JSON</a>
+          ·
+          {% if filename %}
+            <a class="link-secondary" href="/api/items?filename={{ filename }}" target="_blank" rel="noopener">JSON</a>
+          {% else %}
+            <a class="link-secondary" href="/api/items" target="_blank" rel="noopener">JSON</a>
+          {% endif %}
         </div>
+        {% if error %}
+          <div class="alert alert-warning" role="alert">{{ error }}</div>
+        {% endif %}
         <div class="mb-3" style="max-width: 720px;">
           <input id="search" class="form-control form-control-lg" type="search" placeholder="Filter keys or values... (type to filter)" autofocus />
         </div>

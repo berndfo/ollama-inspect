@@ -3,9 +3,16 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, List, Tuple, Optional
 
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template, request
 
 from gguf_utils import GGUFLoadError, extract_all
+from path_utils import (
+    get_blobs_root,
+    normalize_candidate_filename,
+    is_valid_blob_filename,
+    build_model_path_from_filename,
+    digest_to_filename,
+)
 import json
 
 
@@ -147,6 +154,7 @@ def create_app() -> Flask:
                     # layer with mediaType "application/vnd.ollama.image.model" and
                     # use its "size" (bytes). If multiple exist, take the first.
                     model_bytes: Optional[int] = None
+                    model_blob_filename: Optional[str] = None
                     try:
                         for _layer in layers:
                             if (
@@ -156,7 +164,11 @@ def create_app() -> Flask:
                                 sz_val = _layer.get("size")
                                 if isinstance(sz_val, int) and sz_val >= 0:
                                     model_bytes = sz_val
-                                    break
+                                # Derive filename (sha256-<hex>) from digest via util
+                                dg = _layer.get("digest")
+                                if isinstance(dg, str):
+                                    model_blob_filename = digest_to_filename(dg)
+                                break
                     except Exception:
                         model_bytes = None
                     present_size = 0
@@ -185,6 +197,7 @@ def create_app() -> Flask:
                                 present_size += sz
                                 resolved_layers.append({
                                     "digest": digest,
+                                    "filename": digest_to_filename(digest) if isinstance(digest, str) else None,
                                     "size": size,
                                     "path": str(blob_path),
                                     "present": True,
@@ -194,6 +207,7 @@ def create_app() -> Flask:
                                 missing += 1
                                 resolved_layers.append({
                                     "digest": digest,
+                                    "filename": digest_to_filename(digest) if isinstance(digest, str) else None,
                                     "size": size,
                                     "path": str(blob_path),
                                     "present": False,
@@ -202,6 +216,7 @@ def create_app() -> Flask:
                             missing += 1
                             resolved_layers.append({
                                 "digest": digest,
+                                "filename": digest_to_filename(digest) if isinstance(digest, str) else None,
                                 "size": size,
                                 "path": str(blob_path) if blob_path else None,
                                 "present": False,
@@ -226,6 +241,7 @@ def create_app() -> Flask:
                         "model_gb": model_gb,
                         "manifests_root": str(manifests_dir),
                         "blobs_root": str(blobs_dir),
+                        "model_blob_filename": model_blob_filename,
                     })
             else:
                 error = f"Manifests directory not found: {manifests_dir}"
@@ -243,8 +259,38 @@ def create_app() -> Flask:
 
     @app.get("/model/metadata")
     def get_model_metadata():  # type: ignore[override]
-        
-        model_path = "/Users/brainlounge/.ollama/models/blobs/sha256-b5374915da534cb93df39f03bd4f2cd5a0c533df0d5e21957dc9556c260be9eb"
+        # Split into blobs root and filename passed as GET parameter
+        filename = request.args.get("filename", type=str)
+        blobs_root = get_blobs_root()
+        if not filename:
+            # Render a simple error page when filename is missing
+            return render_template(
+                "index.html",
+                model_path=str(blobs_root),
+                items=[],
+                keys_count=0,
+                error="Missing required 'filename' parameter (expected like sha256-<hex>).",
+            )
+        # Normalize/validate filename
+        fn = normalize_candidate_filename(filename)
+        if not fn.startswith("sha256-"):
+            return render_template(
+                "index.html",
+                model_path=str(blobs_root / fn),
+                items=[],
+                keys_count=0,
+                error="Invalid filename. It must start with 'sha256-'.",
+            )
+        # Security: disallow path traversal
+        if not is_valid_blob_filename(fn):
+            return render_template(
+                "index.html",
+                model_path=str(blobs_root / fn),
+                items=[],
+                keys_count=0,
+                error="Invalid filename.",
+            )
+        model_path = build_model_path_from_filename(fn)
         
         # Build items with preview and full JSON once for the template
         kv: Dict[str, Any]
@@ -274,11 +320,19 @@ def create_app() -> Flask:
             model_path=model_path,
             items=items,
             keys_count=len(kv),
+            filename=fn,
         )
 
     @app.get("/api/keys")
     def api_keys():  # type: ignore[override]
-        model_path = "/Users/brainlounge/.ollama/models/blobs/sha256-b5374915da534cb93df39f03bd4f2cd5a0c533df0d5e21957dc9556c260be9eb"
+        filename = request.args.get("filename", type=str)
+        blobs_root = get_blobs_root()
+        if not filename:
+            return jsonify({"error": "Missing 'filename' parameter", "blobs_root": str(blobs_root)}), 400
+        fn = normalize_candidate_filename(filename)
+        if not is_valid_blob_filename(fn):
+            return jsonify({"error": "Invalid filename", "filename": filename}), 400
+        model_path = build_model_path_from_filename(fn)
         
         # Backwards-compatible endpoint: keys only
         try:
@@ -288,6 +342,7 @@ def create_app() -> Flask:
                     "model_path": model_path,
                     "count": len(kv),
                     "keys": sorted(kv.keys()),
+                    "filename": fn,
                 }
             )
         except Exception as e:
@@ -295,7 +350,14 @@ def create_app() -> Flask:
 
     @app.get("/api/items")
     def api_items():  # type: ignore[override]
-        model_path = "/Users/brainlounge/.ollama/models/blobs/sha256-b5374915da534cb93df39f03bd4f2cd5a0c533df0d5e21957dc9556c260be9eb"
+        filename = request.args.get("filename", type=str)
+        blobs_root = get_blobs_root()
+        if not filename:
+            return jsonify({"error": "Missing 'filename' parameter", "blobs_root": str(blobs_root)}), 400
+        fn = normalize_candidate_filename(filename)
+        if not is_valid_blob_filename(fn):
+            return jsonify({"error": "Invalid filename", "filename": filename}), 400
+        model_path = build_model_path_from_filename(fn)
         
         try:
             kv: Dict[str, Any] = extract_all(model_path)
@@ -316,6 +378,7 @@ def create_app() -> Flask:
                 "model_path": model_path,
                 "count": len(kv),
                 "items": data,
+                "filename": fn,
             }
         )
 
