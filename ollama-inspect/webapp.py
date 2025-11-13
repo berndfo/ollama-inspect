@@ -30,11 +30,10 @@ def create_app(model_path: Path) -> Flask:
     app.config["GGUF_PATH"] = str(model_path)
     app.config["GGUF_KEY_VALUES"] = key_values
 
-    def _make_preview(value: Any, max_chars: int = 240, max_lines: int = 6) -> str:
-        """Create a compact, human-friendly preview string for a value.
+    def _make_preview(value: Any, max_chars: int = 240, max_lines: int = 6) -> tuple[str, bool]:
+        """Create a compact preview and a boolean indicating if it was truncated.
 
-        Uses JSON serialization with no extra spaces to keep it dense, then truncates
-        to the specified character and line limits, appending an ellipsis if truncated.
+        Returns (preview_text, is_truncated).
         """
         s = str(value)
 
@@ -49,21 +48,21 @@ def create_app(model_path: Path) -> Flask:
             truncated = True
         if truncated:
             s2 += " …"
-        return s2
+        return s2, truncated
 
     @app.get("/")
     def index():  # type: ignore[override]
         # Build items with preview and full JSON once for the template
         kv: Dict[str, Any] = app.config["GGUF_KEY_VALUES"]
-        items: List[Tuple[str, str, str]] = []  # (key, preview, full_json)
+        items: List[Tuple[str, str, str, bool]] = []  # (key, preview, full_json, expandable)
         for k in sorted(kv.keys()):
             v = kv[k]
-            preview = _make_preview(v)
+            preview, truncated = _make_preview(v)
             try:
                 full_json = json.dumps(v, ensure_ascii=False, indent=2)
             except Exception:
                 full_json = str(v)
-            items.append((k, preview, full_json))
+            items.append((k, preview, full_json, truncated))
 
         return render_template(
             "index.html",
@@ -90,10 +89,12 @@ def create_app(model_path: Path) -> Flask:
         data = []
         for k in sorted(kv.keys()):
             v = kv[k]
+            preview, truncated = _make_preview(v)
             data.append({
                 "key": k,
                 "value": v,
-                "preview": _make_preview(v),
+                "preview": preview,
+                "expandable": bool(truncated),
             })
         return jsonify(
             {
