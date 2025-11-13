@@ -155,6 +155,8 @@ def create_app() -> Flask:
                     # use its "size" (bytes). If multiple exist, take the first.
                     model_bytes: Optional[int] = None
                     model_blob_filename: Optional[str] = None
+                    template_blob_filename: Optional[str] = None
+                    license_blob_filename: Optional[str] = None
                     try:
                         for _layer in layers:
                             if (
@@ -168,7 +170,24 @@ def create_app() -> Flask:
                                 dg = _layer.get("digest")
                                 if isinstance(dg, str):
                                     model_blob_filename = digest_to_filename(dg)
-                                break
+                            # capture template layer
+                            if (
+                                isinstance(_layer, dict)
+                                and _layer.get("mediaType") == "application/vnd.ollama.image.template"
+                                and template_blob_filename is None
+                            ):
+                                dg = _layer.get("digest")
+                                if isinstance(dg, str):
+                                    template_blob_filename = digest_to_filename(dg)
+                            # capture license layer
+                            if (
+                                isinstance(_layer, dict)
+                                and _layer.get("mediaType") == "application/vnd.ollama.image.license"
+                                and license_blob_filename is None
+                            ):
+                                dg = _layer.get("digest")
+                                if isinstance(dg, str):
+                                    license_blob_filename = digest_to_filename(dg)
                     except Exception:
                         model_bytes = None
                     present_size = 0
@@ -242,6 +261,8 @@ def create_app() -> Flask:
                         "manifests_root": str(manifests_dir),
                         "blobs_root": str(blobs_dir),
                         "model_blob_filename": model_blob_filename,
+                        "template_blob_filename": template_blob_filename,
+                        "license_blob_filename": license_blob_filename,
                     })
             else:
                 error = f"Manifests directory not found: {manifests_dir}"
@@ -322,6 +343,61 @@ def create_app() -> Flask:
             keys_count=len(kv),
             filename=fn,
         )
+
+    def _render_text_blob_page(title: str, filename: Optional[str]):
+        blobs_root = get_blobs_root()
+        if not filename:
+            return render_template(
+                "text_blob.html",
+                title=title,
+                model_path=str(blobs_root),
+                filename=None,
+                content="",
+                error="Missing required 'filename' parameter (expected like sha256-<hex>).",
+            )
+        fn = normalize_candidate_filename(filename)
+        if not is_valid_blob_filename(fn):
+            return render_template(
+                "text_blob.html",
+                title=title,
+                model_path=str(blobs_root / fn),
+                filename=fn,
+                content="",
+                error="Invalid filename.",
+            )
+        model_path = build_model_path_from_filename(fn)
+        try:
+            p = Path(model_path)
+            data = p.read_bytes()
+            # decode as utf-8 with replacement to be robust
+            text = data.decode("utf-8", errors="replace")
+            return render_template(
+                "text_blob.html",
+                title=title,
+                model_path=model_path,
+                filename=fn,
+                content=text,
+                error=None,
+            )
+        except Exception as e:
+            return render_template(
+                "text_blob.html",
+                title=title,
+                model_path=model_path,
+                filename=fn,
+                content="",
+                error=str(e),
+            )
+
+    @app.get("/model/license")
+    def get_model_license():  # type: ignore[override]
+        filename = request.args.get("filename", type=str)
+        return _render_text_blob_page("License", filename)
+
+    @app.get("/model/template")
+    def get_model_template():  # type: ignore[override]
+        filename = request.args.get("filename", type=str)
+        return _render_text_blob_page("Template", filename)
 
     @app.get("/api/keys")
     def api_keys():  # type: ignore[override]
