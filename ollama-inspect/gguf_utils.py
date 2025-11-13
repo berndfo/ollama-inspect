@@ -120,10 +120,8 @@ def get_file_host_endian(reader: GGUFReader) -> tuple[str, str]:
         host_endian = file_endian
     return (host_endian, file_endian)
 
-def extract_all(model_path: Path) -> Dict[str, Any]:
-    """Open the GGUF file once and return key->value mapping.
-
-    Returns a tuple: (sorted_keys_list, values_dict)
+def extract_all(model_path: Path) -> Tuple[List[str], Dict[str, Any]]:
+    """Open the GGUF file once and return (sorted_keys_list, values_dict).
 
     - Values are converted to JSON-serializable forms best-effort via _coerce_to_python.
     - Raises GGUFLoadError if the file cannot be opened or parsed.
@@ -170,6 +168,28 @@ def extract_all(model_path: Path) -> Dict[str, Any]:
                 if len(field.data) > 6:
                     content = content[:-1] + ', ...]'
                 log_message += ' = {0}'.format(content)
+        # Populate items dict with full, properly typed values (not truncated like the log)
+        try:
+            if field.types:
+                curr_type = field.types[0]
+                # Strings
+                if curr_type == GGUFValueType.STRING:
+                    value = field.contents()
+                # Scalars (numeric/bool)
+                elif curr_type in reader.gguf_scalar_to_np:
+                    value = field.contents()
+                # Arrays and other container-like fields
+                else:
+                    value = field.contents()
+            else:
+                # No type metadata; fall back to raw contents
+                value = field.contents()
+        except Exception as _:
+            # As a last resort, attempt to store a representation
+            value = repr(getattr(field, 'data', '<no-data>'))
+
+        items[str(field.name)] = _coerce_to_python(value)
+
         print(log_message)  # noqa: NP100
-        
+
     return items
