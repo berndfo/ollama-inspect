@@ -9,26 +9,16 @@ from gguf_utils import GGUFLoadError, extract_all
 import json
 
 
-def create_app(model_path: Path) -> Flask:
+def create_app() -> Flask:
     """Application factory.
 
-    Loads GGUF keys once at startup and serves them via HTML and JSON.
+    Defers loading GGUF keys until an endpoint that needs them is invoked.
     """
     app = Flask(
         __name__,
         template_folder=str(Path(__file__).parent / "templates"),
         static_folder=None,
     )
-
-    try:
-        # Load keys and values in one go to avoid double-reading the GGUF file
-        key_values = extract_all(model_path)
-    except GGUFLoadError as e:
-        # Fail fast with a clear startup error
-        raise RuntimeError(str(e)) from e
-
-    app.config["GGUF_PATH"] = str(model_path)
-    app.config["GGUF_KEY_VALUES"] = key_values
 
     def _make_preview(value: Any, max_chars: int = 240, max_lines: int = 6) -> tuple[str, bool]:
         """Create a compact preview and a boolean indicating if it was truncated.
@@ -251,11 +241,24 @@ def create_app(model_path: Path) -> Flask:
             error=error,
         )
 
-    # Previous index (GGUF model metadata) is now available at /model/metadata
     @app.get("/model/metadata")
-    def index():  # type: ignore[override]
+    def get_model_metadata():  # type: ignore[override]
+        
+        model_path = "/Users/brainlounge/.ollama/models/blobs/sha256-b5374915da534cb93df39f03bd4f2cd5a0c533df0d5e21957dc9556c260be9eb"
+        
         # Build items with preview and full JSON once for the template
-        kv: Dict[str, Any] = app.config["GGUF_KEY_VALUES"]
+        kv: Dict[str, Any]
+        try:
+            kv = extract_all(model_path)
+        except Exception as e:
+            # Render a simple error page
+            return render_template(
+                "index.html",
+                model_path=model_path,
+                items=[],
+                keys_count=0,
+                error=str(e),
+            )
         items: List[Tuple[str, str, str, bool]] = []  # (key, preview, full_json, expandable)
         for k in sorted(kv.keys()):
             v = kv[k]
@@ -268,26 +271,36 @@ def create_app(model_path: Path) -> Flask:
 
         return render_template(
             "index.html",
-            model_path=app.config["GGUF_PATH"],
+            model_path=model_path,
             items=items,
-            keys_count=len(app.config["GGUF_KEY_VALUES"]),
+            keys_count=len(kv),
         )
 
     @app.get("/api/keys")
     def api_keys():  # type: ignore[override]
+        model_path = "/Users/brainlounge/.ollama/models/blobs/sha256-b5374915da534cb93df39f03bd4f2cd5a0c533df0d5e21957dc9556c260be9eb"
+        
         # Backwards-compatible endpoint: keys only
-        kv: Dict[str, Any] = app.config["GGUF_KEY_VALUES"]
-        return jsonify(
-            {
-                "model_path": app.config["GGUF_PATH"],
-                "count": len(kv),
-                "keys": sorted(kv.keys()),
-            }
-        )
+        try:
+            kv: Dict[str, Any] = extract_all(model_path)
+            return jsonify(
+                {
+                    "model_path": model_path,
+                    "count": len(kv),
+                    "keys": sorted(kv.keys()),
+                }
+            )
+        except Exception as e:
+            return jsonify({"error": str(e), "model_path": model_path}), 500
 
     @app.get("/api/items")
     def api_items():  # type: ignore[override]
-        kv: Dict[str, Any] = app.config["GGUF_KEY_VALUES"]
+        model_path = "/Users/brainlounge/.ollama/models/blobs/sha256-b5374915da534cb93df39f03bd4f2cd5a0c533df0d5e21957dc9556c260be9eb"
+        
+        try:
+            kv: Dict[str, Any] = extract_all(model_path)
+        except Exception as e:
+            return jsonify({"error": str(e), "model_path": model_path}), 500
         data = []
         for k in sorted(kv.keys()):
             v = kv[k]
@@ -300,7 +313,7 @@ def create_app(model_path: Path) -> Flask:
             })
         return jsonify(
             {
-                "model_path": app.config["GGUF_PATH"],
+                "model_path": model_path,
                 "count": len(kv),
                 "items": data,
             }

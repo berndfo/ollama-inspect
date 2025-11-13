@@ -15,13 +15,10 @@ from typing import Optional
 
 def _parse_args(argv: list[str]) -> tuple[Optional[Path], str, int]:
     """Parse CLI args. Returns (model_path, host, port)."""
-    model_path: Optional[Path] = None
     host = "127.0.0.1"
     port = 13655
 
     args = list(argv[1:])
-    if args and not args[0].startswith("--"):
-        model_path = Path(args.pop(0))
 
     i = 0
     while i < len(args):
@@ -37,7 +34,7 @@ def _parse_args(argv: list[str]) -> tuple[Optional[Path], str, int]:
             i += 2
         else:
             _die(f"Unknown argument: {a}")
-    return model_path, host, port
+    return host, port
 
 
 def _die(msg: str, code: int = 1) -> "None":
@@ -46,14 +43,7 @@ def _die(msg: str, code: int = 1) -> "None":
 
 
 def main(argv: list[str]) -> int:
-    model_path, host, port = _parse_args(argv)
-
-    if model_path is None:
-        print("Usage: python main.py /path/to/your_model.gguf [--host 127.0.0.1] [--port 13655]")
-        return 2
-
-    if not model_path.exists():
-        _die(f"File not found: {model_path}")
+    host, port = _parse_args(argv)
 
     # Import here to keep main module lightweight for other tooling
     try:
@@ -61,11 +51,10 @@ def main(argv: list[str]) -> int:
     except Exception as e:
         _die(f"Failed to import web application components: {e}")
 
-    app = create_app(model_path)
+    app = create_app()
     # Run development server (sufficient for local inspection use case)
     app.run(host=host, port=port, debug=False)
     return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main(sys.argv))
