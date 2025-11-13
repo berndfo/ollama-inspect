@@ -6,7 +6,9 @@ We only need to extract the available keys from the file's fields.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, Iterable, List
+from typing import Any, Dict, Iterable, List, Tuple
+
+from gguf import GGUFReader, GGUFValueType
 
 
 class GGUFLoadError(Exception):
@@ -18,23 +20,8 @@ def extract_keys(model_path: Path) -> List[str]:
 
     Raises GGUFLoadError if the file cannot be opened or parsed.
     """
-    try:
-        import gguf  # type: ignore
-    except Exception as e:  # pragma: no cover - optional friendly message
-        raise GGUFLoadError(
-            "The 'gguf' package is required. Install it via 'pip install gguf'."
-        ) from e
-
-    try:
-        reader = gguf.GGUFReader(str(model_path))
-    except Exception as e:
-        raise GGUFLoadError(f"Could not open GGUF file '{model_path}': {e}") from e
-
-    try:
-        keys: Iterable[str] = reader.fields.keys()
-        return sorted(list(keys))
-    except Exception as e:
-        raise GGUFLoadError(f"Failed to read fields from '{model_path}': {e}") from e
+    keys, _ = extract_all(model_path)
+    return keys
 
 
 def _coerce_to_python(obj: Any) -> Any:
@@ -121,6 +108,26 @@ def extract_key_values(model_path: Path) -> Dict[str, Any]:
 
     Raises GGUFLoadError if the file cannot be opened or parsed.
     """
+    _, values = extract_all(model_path)
+    return values
+
+
+def get_file_host_endian(reader: GGUFReader) -> tuple[str, str]:
+    file_endian = reader.endianess.name
+    if reader.byte_order == 'S':
+        host_endian = 'BIG' if file_endian == 'LITTLE' else 'LITTLE'
+    else:
+        host_endian = file_endian
+    return (host_endian, file_endian)
+
+def extract_all(model_path: Path) -> Dict[str, Any]:
+    """Open the GGUF file once and return key->value mapping.
+
+    Returns a tuple: (sorted_keys_list, values_dict)
+
+    - Values are converted to JSON-serializable forms best-effort via _coerce_to_python.
+    - Raises GGUFLoadError if the file cannot be opened or parsed.
+    """
     try:
         import gguf  # type: ignore
     except Exception as e:  # pragma: no cover - optional friendly message
@@ -133,23 +140,36 @@ def extract_key_values(model_path: Path) -> Dict[str, Any]:
     except Exception as e:
         raise GGUFLoadError(f"Could not open GGUF file '{model_path}': {e}") from e
 
-    try:
-        items: Dict[str, Any] = {}
-        for k, field in reader.fields.items():
-            # Best-effort attempt to extract the underlying value
-            value = None
-            # Try common accessors first
-            for attr in ("get_value", "value", "data"):
-                try:
-                    v = getattr(field, attr)
-                    value = v() if callable(v) else v
-                    break
-                except Exception:
-                    continue
-            if value is None:
-                # Some gguf versions store directly accessible value or have useful repr
-                value = field
-            items[str(k)] = _coerce_to_python(value)
-        return items
-    except Exception as e:
-        raise GGUFLoadError(f"Failed to read fields from '{model_path}': {e}") from e
+    host_endian, file_endian = get_file_host_endian(reader)
+    print(f'* File is {file_endian} endian, script is running on a {host_endian} endian host.')  # noqa: NP100
+    print(f'* Dumping {len(reader.fields)} key/value pair(s)')  # noqa: NP100
+    
+    items: Dict[str, Any] = {}
+    
+    for n, field in enumerate(reader.fields.values(), 1):
+        if not field.types:
+            pretty_type = 'N/A'
+        elif field.types[0] == GGUFValueType.ARRAY:
+            nest_count = len(field.types) - 1
+            pretty_type = '[' * nest_count + str(field.types[-1].name) + ']' * nest_count
+        else:
+            pretty_type = str(field.types[-1].name)
+
+        log_message = f'  {n:5}: {pretty_type:10} | {len(field.data):8} | {field.name}'
+        if field.types:
+            curr_type = field.types[0]
+            if curr_type == GGUFValueType.STRING:
+                content = field.contents()
+                if len(content) > 60:
+                    content = content[:57] + '...'
+                log_message += ' = {0}'.format(repr(content))
+            elif curr_type in reader.gguf_scalar_to_np:
+                log_message += ' = {0}'.format(field.contents())
+            else:
+                content = repr(field.contents(slice(6)))
+                if len(field.data) > 6:
+                    content = content[:-1] + ', ...]'
+                log_message += ' = {0}'.format(content)
+        print(log_message)  # noqa: NP100
+        
+    return items

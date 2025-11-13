@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Tuple
 
 from flask import Flask, jsonify, render_template
 
-from gguf_utils import GGUFLoadError, extract_keys, extract_key_values
+from gguf_utils import GGUFLoadError, extract_all
 import json
 
 
@@ -21,9 +21,9 @@ def create_app(model_path: Path) -> Flask:
     )
 
     try:
-        # Keep simple keys list for compatibility, but also load values for previews
-        keys: List[str] = extract_keys(model_path)
-        key_values: Dict[str, Any] = extract_key_values(model_path)
+        # Load keys and values in one go to avoid double-reading the GGUF file
+        key_values = extract_all(model_path)
+        keys = key_values.keys()
     except GGUFLoadError as e:
         # Fail fast with a clear startup error
         raise RuntimeError(str(e)) from e
