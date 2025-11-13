@@ -23,13 +23,11 @@ def create_app(model_path: Path) -> Flask:
     try:
         # Load keys and values in one go to avoid double-reading the GGUF file
         key_values = extract_all(model_path)
-        keys = key_values.keys()
     except GGUFLoadError as e:
         # Fail fast with a clear startup error
         raise RuntimeError(str(e)) from e
 
     app.config["GGUF_PATH"] = str(model_path)
-    app.config["GGUF_KEYS"] = keys
     app.config["GGUF_KEY_VALUES"] = key_values
 
     def _make_preview(value: Any, max_chars: int = 240, max_lines: int = 6) -> str:
@@ -71,17 +69,18 @@ def create_app(model_path: Path) -> Flask:
             "index.html",
             model_path=app.config["GGUF_PATH"],
             items=items,
-            keys_count=len(app.config["GGUF_KEYS"]),
+            keys_count=len(app.config["GGUF_KEY_VALUES"]),
         )
 
     @app.get("/api/keys")
     def api_keys():  # type: ignore[override]
         # Backwards-compatible endpoint: keys only
+        kv: Dict[str, Any] = app.config["GGUF_KEY_VALUES"]
         return jsonify(
             {
                 "model_path": app.config["GGUF_PATH"],
-                "count": len(app.config["GGUF_KEYS"]),
-                "keys": app.config["GGUF_KEYS"],
+                "count": len(kv),
+                "keys": sorted(kv.keys()),
             }
         )
 
