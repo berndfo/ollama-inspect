@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ollama Home – Models & Blobs</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
+    <style>
+      :root { color-scheme: light dark; }
+      code { background: rgba(127,127,127,0.15); padding: 0.1rem 0.3rem; border-radius: 4px; }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+      details > summary { cursor: pointer; }
+    </style>
+  </head>
+  <body>
+    <div class="container py-4">
+      <header class="mb-3">
+        <h1 class="h3 mb-2">Ollama Model Repository</h1>
+        <div class="text-muted small">
+          Root: <code>{{ ollama_root }}</code>
+          · Manifests: <code>{{ manifests_root }}</code>
+          · Blobs: <code>{{ blobs_root }}</code>
+        </div>
+      </header>
+
+      {% if error %}
+        <div class="alert alert-warning" role="alert">{{ error }}</div>
+      {% endif %}
+
+      {% if entries and entries|length > 0 %}
+        <div class="mb-3 text-muted small">Total manifests: <span class="badge text-bg-secondary">{{ entries|length }}</span></div>
+
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead>
+              <tr>
+                <th style="width: 70%">Model</th>
+                <th style="width: 30%" class="text-end">Size (GB)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for e in entries %}
+                <tr>
+                  <td class="mono">
+                    {% if e.model_blob_filename %}
+                      <span class="text-decoration-none">{{ e.name }}</span>
+                      <div class="small text-muted">
+                        <a class="link-secondary" href="/model/metadata?filename={{ e.model_blob_filename }}">Model Metadata</a>
+                        {% if e.template_blob_filename or e.license_blob_filename %}
+                          |
+                          {% if e.template_blob_filename %}
+                            <a class="link-secondary" href="/model/template?filename={{ e.template_blob_filename }}">Template</a>
+                          {% endif %}
+                          {% if e.license_blob_filename %}
+                            {% if e.template_blob_filename %}|
+                            {% endif %}
+                            <a class="link-secondary" href="/model/license?filename={{ e.license_blob_filename }}">License</a>
+                          {% endif %}
+                        {% endif %}
+                      </div>
+                    {% else %}
+                      <span class="text-decoration-none">{{ e.name }}</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-end">
+                    {% if e.model_gb %}
+                      {{ e.model_gb }}
+                      <span class="text-muted small" title="{{ e.model_bytes }} bytes">GB</span>
+                    {% else %}
+                      <span class="text-muted">–</span>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="text-muted">No manifests found.</p>
+      {% endif %}
+    </div>
+
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+      crossorigin="anonymous"></script>
+  </body>
+  </html>
