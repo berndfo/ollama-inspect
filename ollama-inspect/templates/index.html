@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GGUF Keys – Ollama Inspect</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; margin: 2rem; }
+      header { margin-bottom: 1rem; }
+      code { background: rgba(127,127,127,0.15); padding: 0.1rem 0.3rem; border-radius: 4px; }
+      #search { padding: 0.5rem; width: min(640px, 90vw); }
+      .meta { color: #888; margin: 0.25rem 0 1rem; }
+      ul { list-style: none; padding: 0; }
+      li { padding: 0.25rem 0; border-bottom: 1px solid rgba(127,127,127,0.2); }
+      .hidden { display: none; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>GGUF Keys</h1>
+      <div class="meta">
+        File: <code>{{ model_path }}</code> · Total keys: <strong id="count">{{ keys_count }}</strong>
+        · <a href="/api/keys" target="_blank" rel="noopener">JSON</a>
+      </div>
+      <input id="search" type="search" placeholder="Filter keys... (type to filter)" autofocus />
+    </header>
+
+    <ul id="keys">
+      {% for k in keys %}
+        <li class="key-item"><code>{{ k }}</code></li>
+      {% endfor %}
+    </ul>
+
+    <script>
+      const search = document.getElementById('search');
+      const items = Array.from(document.querySelectorAll('.key-item'));
+      const count = document.getElementById('count');
+      function applyFilter() {
+        const q = search.value.toLowerCase();
+        let visible = 0;
+        for (const li of items) {
+          const text = li.textContent.toLowerCase();
+          const show = !q || text.includes(q);
+          li.style.display = show ? '' : 'none';
+          if (show) visible++;
+        }
+        count.textContent = visible;
+      }
+      search.addEventListener('input', applyFilter);
+    </script>
+  </body>
+  </html>
