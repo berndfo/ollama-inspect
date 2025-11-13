@@ -64,6 +64,61 @@ def create_app(model_path: Path) -> Flask:
         entries: List[Dict[str, Any]] = []
         error: Optional[str] = None
 
+        def _is_valid_manifest(m: Dict[str, Any]) -> bool:
+            try:
+                # Top-level mandatory fields
+                if m.get("schemaVersion") != 2:
+                    return False
+                if m.get("mediaType") != "application/vnd.docker.distribution.manifest.v2+json":
+                    return False
+
+                # Config object validation
+                cfg = m.get("config")
+                if not isinstance(cfg, dict):
+                    return False
+                if cfg.get("mediaType") != "application/vnd.docker.container.image.v1+json":
+                    return False
+                digest = cfg.get("digest")
+                if not isinstance(digest, str) or not digest.startswith("sha256:"):
+                    return False
+                size = cfg.get("size")
+                if not isinstance(size, int) or size < 0:
+                    return False
+
+                # Layers validation
+                layers = m.get("layers")
+                if not isinstance(layers, list) or not layers:
+                    return False
+                allowed_layer_media_types = {
+                    "application/vnd.ollama.image.model",
+                    "application/vnd.ollama.image.template",
+                    "application/vnd.ollama.image.license",
+                    # Accept extended manifests that include params layer
+                    "application/vnd.ollama.image.params",
+                }
+                # Must contain at least the model layer
+                has_model_layer = False
+                for layer in layers:
+                    if not isinstance(layer, dict):
+                        return False
+                    lmt = layer.get("mediaType")
+                    if lmt not in allowed_layer_media_types:
+                        return False
+                    if lmt == "application/vnd.ollama.image.model":
+                        has_model_layer = True
+                    ldigest = layer.get("digest")
+                    if not isinstance(ldigest, str) or not ldigest.startswith("sha256:"):
+                        return False
+                    lsize = layer.get("size")
+                    if not isinstance(lsize, int) or lsize < 0:
+                        return False
+                if not has_model_layer:
+                    return False
+
+                return True
+            except Exception:
+                return False
+
         try:
             if manifests_dir.exists():
                 for mf in sorted(manifests_dir.glob("**/*")):
@@ -73,22 +128,47 @@ def create_app(model_path: Path) -> Flask:
                         with mf.open("r", encoding="utf-8") as f:
                             manifest = json.load(f)
                     except Exception:
-                        # unreadable manifest; show as-is
-                        entries.append({
-                            "name": mf.name,
-                            "path": str(mf),
-                            "created": mf.stat().st_mtime,
-                            "total_size": None,
-                            "layers": [],
-                            "missing": None,
-                            "error": "Failed to parse manifest JSON",
-                        })
+                        # Unreadable manifest; skip — only show files adhering to the schema
+                        continue
+
+                    # Only process and show files that adhere to the required JSON schema
+                    if not _is_valid_manifest(manifest):
                         continue
 
                     # Manifest semantics (best-effort):
                     # Expect fields like: schemaVersion, model (name:tag), layers: [{digest, size}]
                     name = manifest.get("model") or manifest.get("name") or mf.stem
+                    # Prefix the model name with the parent directory name of the JSON file
+                    try:
+                        parent_dir = mf.parent.name
+                        # Avoid double-prefixing if name already appears to include the parent dir
+                        if parent_dir and not (
+                            str(name).startswith(parent_dir + "/")
+                            or str(name).startswith(parent_dir + ":")
+                            or ("/" in str(name) and str(name).split("/", 1)[0] == parent_dir)
+                        ):
+                            display_name = f"{parent_dir}/{name}"
+                        else:
+                            display_name = str(name)
+                    except Exception:
+                        display_name = str(name)
                     layers = manifest.get("layers") or []
+                    # Extract the declared model size from the manifest: look for the
+                    # layer with mediaType "application/vnd.ollama.image.model" and
+                    # use its "size" (bytes). If multiple exist, take the first.
+                    model_bytes: Optional[int] = None
+                    try:
+                        for _layer in layers:
+                            if (
+                                isinstance(_layer, dict)
+                                and _layer.get("mediaType") == "application/vnd.ollama.image.model"
+                            ):
+                                sz_val = _layer.get("size")
+                                if isinstance(sz_val, int) and sz_val >= 0:
+                                    model_bytes = sz_val
+                                    break
+                    except Exception:
+                        model_bytes = None
                     present_size = 0
                     total_layers = 0
                     missing = 0
@@ -137,13 +217,23 @@ def create_app(model_path: Path) -> Flask:
                                 "present": False,
                             })
 
+                    # Pre-format GB value (decimal GB as requested).
+                    model_gb: Optional[str]
+                    if isinstance(model_bytes, int):
+                        gb = model_bytes / 1_000_000_000.0
+                        model_gb = f"{gb:.2f}"
+                    else:
+                        model_gb = None
+
                     entries.append({
-                        "name": name,
+                        "name": display_name,
                         "path": str(mf),
                         "created": mf.stat().st_mtime,
                         "total_size": present_size,
                         "layers": resolved_layers,
                         "missing": missing,
+                        "model_bytes": model_bytes,
+                        "model_gb": model_gb,
                         "manifests_root": str(manifests_dir),
                         "blobs_root": str(blobs_dir),
                     })
