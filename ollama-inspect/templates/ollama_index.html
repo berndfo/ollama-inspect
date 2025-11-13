@@ -33,19 +33,23 @@
       {% endif %}
 
       {% if entries and entries|length > 0 %}
-        <div class="mb-3 text-muted small">Total manifests: <span class="badge text-bg-secondary">{{ entries|length }}</span></div>
+        <div class="mb-3 text-muted small">Total manifests: <span class="badge text-bg-secondary" id="count">{{ entries|length }}</span></div>
+
+        <div class="mb-3" style="max-width: 720px;">
+          <input id="search" class="form-control form-control-lg" type="search" placeholder="Filter models... (type to filter)" autofocus />
+        </div>
 
         <div class="table-responsive">
           <table class="table table-sm align-middle">
             <thead>
               <tr>
-                <th style="width: 70%">Model</th>
-                <th style="width: 30%" class="text-end">Size (GB)</th>
+                <th id="sort-name" class="sortable" style="width: 70%" aria-sort="none">Model <span class="sort-indicator"></span></th>
+                <th id="sort-size" class="text-end sortable" style="width: 30%" aria-sort="none">Size (GB) <span class="sort-indicator"></span></th>
               </tr>
             </thead>
-            <tbody>
+            <tbody id="models">
               {% for e in entries %}
-                <tr>
+                <tr class="model-item" data-name="{{ e.name|lower }}" {% if e.model_bytes %}data-bytes="{{ e.model_bytes }}"{% endif %}>
                   <td class="mono">
                     {% if e.model_blob_filename %}
                       <span class="text-decoration-none">{{ e.name }}</span>
@@ -84,6 +88,93 @@
         <p class="text-muted">No manifests found.</p>
       {% endif %}
     </div>
+
+    <script>
+      // Simple in-page filter (mirrors the behavior on the metadata page)
+      const search = document.getElementById('search');
+      const rows = Array.from(document.querySelectorAll('.model-item'));
+      const count = document.getElementById('count');
+      const tbody = document.getElementById('models');
+      const thName = document.getElementById('sort-name');
+      const thSize = document.getElementById('sort-size');
+      const indicators = () => Array.from(document.querySelectorAll('th.sortable .sort-indicator'));
+      const headers = [thName, thSize].filter(Boolean);
+      if (search && rows.length && count) {
+        function applyFilter() {
+          const q = search.value.toLowerCase();
+          let visible = 0;
+          for (const tr of rows) {
+            const text = tr.textContent.toLowerCase();
+            const show = !q || text.includes(q);
+            tr.style.display = show ? '' : 'none';
+            if (show) visible++;
+          }
+          count.textContent = visible;
+        }
+        search.addEventListener('input', applyFilter);
+      }
+
+      // Sorting
+      let sortState = { key: null, dir: 1 }; // dir: 1 asc, -1 desc
+
+      function updateSortIndicators() {
+        for (const th of headers) {
+          th.setAttribute('aria-sort', 'none');
+          const span = th.querySelector('.sort-indicator');
+          if (span) span.textContent = '';
+        }
+        if (!sortState.key) return;
+        const th = sortState.key === 'name' ? thName : thSize;
+        if (!th) return;
+        th.setAttribute('aria-sort', sortState.dir === 1 ? 'ascending' : 'descending');
+        const span = th.querySelector('.sort-indicator');
+        if (span) span.textContent = sortState.dir === 1 ? '▲' : '▼';
+      }
+
+      function compareName(a, b) {
+        const an = a.dataset.name || '';
+        const bn = b.dataset.name || '';
+        if (an < bn) return -1;
+        if (an > bn) return 1;
+        return 0;
+      }
+
+      function compareSize(a, b) {
+        const avRaw = a.dataset.bytes;
+        const bvRaw = b.dataset.bytes;
+        const aMissing = avRaw === undefined || avRaw === '';
+        const bMissing = bvRaw === undefined || bvRaw === '';
+        if (aMissing && bMissing) return 0;
+        if (aMissing) return 1; // missing sizes go last
+        if (bMissing) return -1;
+        const av = Number(avRaw);
+        const bv = Number(bvRaw);
+        if (av < bv) return -1;
+        if (av > bv) return 1;
+        return 0;
+      }
+
+      function applySort() {
+        if (!sortState.key) return;
+        const cmp = sortState.key === 'name' ? compareName : compareSize;
+        rows.sort((a, b) => sortState.dir * cmp(a, b));
+        for (const tr of rows) tbody.appendChild(tr); // re-append in new order
+        updateSortIndicators();
+      }
+
+      function toggleSort(key) {
+        if (sortState.key === key) {
+          sortState.dir = -1 * sortState.dir; // toggle
+        } else {
+          sortState.key = key;
+          sortState.dir = 1; // default to ascending
+        }
+        applySort();
+      }
+
+      if (thName) thName.addEventListener('click', () => toggleSort('name'));
+      if (thSize) thSize.addEventListener('click', () => toggleSort('size'));
+    </script>
 
     <script
       src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
