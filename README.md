@@ -18,6 +18,7 @@ Contents
 - Requirements
 - Installation
 - Quick start
+- Screenshots
 - How it finds your models
 - Using the web UI
 - API endpoints
@@ -81,6 +82,18 @@ http://127.0.0.1:13655/
 Notes
 - `--host` defaults to `127.0.0.1`.
 - `--port` defaults to `13655`.
+
+
+Screenshots
+-----------
+
+Home page — models overview
+
+![Home page — models overview](./ollama-inspect-overview.png)
+
+Model metadata — key/value view
+
+![Model metadata — key/value view](./ollama-inspect-keyvalues.png)
 
 
 How it finds your models
