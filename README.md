@@ -46,7 +46,7 @@ Installation
 1) Clone this repository
 
 ```
-git clone https://github.com/your-user-or-org/ollama-inspect.git
+git clone https://github.com/berndfo/ollama-inspect.git
 cd ollama-inspect
 ```
 
