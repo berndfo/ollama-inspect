@@ -157,6 +157,7 @@ def create_app() -> Flask:
                     model_blob_filename: Optional[str] = None
                     template_blob_filename: Optional[str] = None
                     license_blob_filename: Optional[str] = None
+                    params_blob_filename: Optional[str] = None
                     try:
                         for _layer in layers:
                             if (
@@ -188,6 +189,15 @@ def create_app() -> Flask:
                                 dg = _layer.get("digest")
                                 if isinstance(dg, str):
                                     license_blob_filename = digest_to_filename(dg)
+                            # capture params layer (new)
+                            if (
+                                isinstance(_layer, dict)
+                                and _layer.get("mediaType") == "application/vnd.ollama.image.params"
+                                and params_blob_filename is None
+                            ):
+                                dg = _layer.get("digest")
+                                if isinstance(dg, str):
+                                    params_blob_filename = digest_to_filename(dg)
                     except Exception:
                         model_bytes = None
                     present_size = 0
@@ -263,6 +273,7 @@ def create_app() -> Flask:
                         "model_blob_filename": model_blob_filename,
                         "template_blob_filename": template_blob_filename,
                         "license_blob_filename": license_blob_filename,
+                        "params_blob_filename": params_blob_filename,
                     })
             else:
                 error = f"Manifests directory not found: {manifests_dir}"
@@ -398,6 +409,91 @@ def create_app() -> Flask:
     def get_model_template():  # type: ignore[override]
         filename = request.args.get("filename", type=str)
         return _render_text_blob_page("Template", filename)
+
+    @app.get("/model/params")
+    def get_model_params():  # type: ignore[override]
+        """Render parameters blob as a key/value table on a separate page.
+
+        Expects a `filename` query parameter with value like `sha256-<hex>`.
+        The params blob is expected to be JSON (object). If not JSON, we try a
+        permissive line-based `key: value` fallback parser.
+        """
+        filename = request.args.get("filename", type=str)
+        blobs_root = get_blobs_root()
+        if not filename:
+            return render_template(
+                "model_params.html",
+                model_path=str(blobs_root),
+                filename=None,
+                params_items=[],
+                params_count=0,
+                error="Missing required 'filename' parameter (expected like sha256-<hex>).",
+            )
+        fn = normalize_candidate_filename(filename)
+        if not is_valid_blob_filename(fn):
+            return render_template(
+                "model_params.html",
+                model_path=str(blobs_root / fn),
+                filename=fn,
+                params_items=[],
+                params_count=0,
+                error="Invalid filename.",
+            )
+        model_path = build_model_path_from_filename(fn)
+        params: Dict[str, Any] = {}
+        error: Optional[str] = None
+        try:
+            p = Path(model_path)
+            raw = p.read_text(encoding="utf-8", errors="replace").strip()
+            # Try JSON first
+            try:
+                data = json.loads(raw)
+                if isinstance(data, dict):
+                    params = data
+                else:
+                    # If array of key/value pairs, convert; otherwise stringify
+                    if isinstance(data, list):
+                        for i, item in enumerate(data):
+                            if isinstance(item, dict):
+                                for k, v in item.items():
+                                    params[str(k)] = v
+                            else:
+                                params[f"[{i}]"] = item
+                    else:
+                        params["value"] = data
+            except Exception:
+                # Fallback: parse simple `key: value` lines
+                for line in raw.splitlines():
+                    line = line.strip()
+                    if not line or line.startswith("#"):
+                        continue
+                    if ":" in line:
+                        k, v = line.split(":", 1)
+                        params[k.strip()] = v.strip()
+        except Exception as e:
+            error = str(e)
+
+        # Build display items
+        items: List[Tuple[str, str]] = []
+        for k in sorted(params.keys(), key=lambda x: str(x).lower()):
+            v = params[k]
+            try:
+                if isinstance(v, (dict, list)):
+                    v_str = json.dumps(v, ensure_ascii=False)
+                else:
+                    v_str = str(v)
+            except Exception:
+                v_str = str(v)
+            items.append((str(k), v_str))
+
+        return render_template(
+            "model_params.html",
+            model_path=model_path,
+            filename=fn,
+            params_items=items,
+            params_count=len(items),
+            error=error,
+        )
 
     @app.get("/api/keys")
     def api_keys():  # type: ignore[override]
