@@ -36,7 +36,7 @@
         <div class="mb-3 text-muted small">Total manifests: <span class="badge text-bg-secondary" id="count">{{ entries|length }}</span></div>
 
         <div class="mb-3" style="max-width: 720px;">
-          <input id="search" class="form-control form-control-lg" type="search" placeholder="Filter models... (type to filter)" autofocus />
+          <input id="search" class="form-control" type="search" placeholder="Filter models... (type to filter)" autofocus />
         </div>
 
         <div class="table-responsive">
@@ -68,7 +68,7 @@
                           {% if e.params_blob_filename %}
                             {% if e.template_blob_filename or e.license_blob_filename %}|
                             {% endif %}
-                            <a class="link-secondary" target="_blank" href="/model/params?filename={{ e.params_blob_filename }}">Params</a>
+                            <a class="link-secondary" target="_blank" href="/model/params?filename={{ e.params_blob_filename }}">Parameter Presets</a>
                           {% endif %}
                         {% endif %}
                       </div>
