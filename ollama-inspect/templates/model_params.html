@@ -20,7 +20,7 @@
   <body>
     <div class="container py-4">
       <header class="mb-3">
-        <h1 class="h3 mb-2">Model Parameters</h1>
+        <h1 class="h3 mb-2">Model Parameters{% if model_name %} – {{ model_name }}{% endif %}</h1>
         <div class="text-muted small mb-2">
           File: <code>{{ model_path }}</code>
           · Total params: <span class="badge text-bg-secondary" id="count">{{ params_count }}</span>

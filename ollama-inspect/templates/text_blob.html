@@ -19,7 +19,7 @@
   <body>
     <div class="container py-4">
       <header class="mb-3">
-        <h1 class="h3 mb-2">{{ title }}</h1>
+        <h1 class="h3 mb-2">{{ title }}{% if model_name %} – {{ model_name }}{% endif %}</h1>
         <div class="text-muted small mb-2">
           File: <code>{{ model_path }}</code>
         </div>

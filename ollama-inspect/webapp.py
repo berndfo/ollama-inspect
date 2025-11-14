@@ -372,6 +372,7 @@ def create_app() -> Flask:
                     model_path=str(blobs_root),
                     items=[],
                     keys_count=0,
+                    model_name=model,
                     error=err,
                 )
             filename = resolved
@@ -416,6 +417,7 @@ def create_app() -> Flask:
                 model_path=model_path,
                 items=[],
                 keys_count=0,
+                model_name=model,
                 error=str(e),
             )
         items: List[Tuple[str, str, str, bool]] = []  # (key, preview, full_json, expandable)
@@ -434,9 +436,10 @@ def create_app() -> Flask:
             items=items,
             keys_count=len(kv),
             filename=fn,
+            model_name=model,
         )
 
-    def _render_text_blob_page(title: str, filename: Optional[str]):
+    def _render_text_blob_page(title: str, filename: Optional[str], model_name: Optional[str] = None):
         blobs_root = get_blobs_root()
         if not filename:
             return render_template(
@@ -445,6 +448,7 @@ def create_app() -> Flask:
                 model_path=str(blobs_root),
                 filename=None,
                 content="",
+                model_name=model_name,
                 error="Missing required 'filename' parameter (expected like sha256-<hex>).",
             )
         fn = normalize_candidate_filename(filename)
@@ -455,6 +459,7 @@ def create_app() -> Flask:
                 model_path=str(blobs_root / fn),
                 filename=fn,
                 content="",
+                model_name=model_name,
                 error="Invalid filename.",
             )
         model_path = build_model_path_from_filename(fn)
@@ -469,6 +474,7 @@ def create_app() -> Flask:
                 model_path=model_path,
                 filename=fn,
                 content=text,
+                model_name=model_name,
                 error=None,
             )
         except Exception as e:
@@ -478,6 +484,7 @@ def create_app() -> Flask:
                 model_path=model_path,
                 filename=fn,
                 content="",
+                model_name=model_name,
                 error=str(e),
             )
 
@@ -495,10 +502,11 @@ def create_app() -> Flask:
                     model_path=str(get_blobs_root()),
                     filename=None,
                     content="",
+                    model_name=model,
                     error=err,
                 )
             filename = resolved
-        return _render_text_blob_page("License", filename)
+        return _render_text_blob_page("License", filename, model_name=model)
 
     @app.get("/model/template")
     def get_model_template():  # type: ignore[override]
@@ -513,10 +521,11 @@ def create_app() -> Flask:
                     model_path=str(get_blobs_root()),
                     filename=None,
                     content="",
+                    model_name=model,
                     error=err,
                 )
             filename = resolved
-        return _render_text_blob_page("Template", filename)
+        return _render_text_blob_page("Template", filename, model_name=model)
 
     @app.get("/model/params")
     def get_model_params():  # type: ignore[override]
@@ -538,6 +547,7 @@ def create_app() -> Flask:
                     filename=None,
                     params_items=[],
                     params_count=0,
+                    model_name=model,
                     error=err,
                 )
             filename = resolved
@@ -613,6 +623,7 @@ def create_app() -> Flask:
             filename=fn,
             params_items=items,
             params_count=len(items),
+            model_name=model,
             error=error,
         )
 
