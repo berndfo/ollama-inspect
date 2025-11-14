@@ -70,6 +70,7 @@
                     {% else %}
                       <span class="text-decoration-none">{{ e.name }}</span>
                     {% endif %}
+                    <div class="small text-muted mt-1">Manifest: <code title="Manifest file path">{{ e.path }}</code></div>
                   </td>
                   <td class="text-end">
                     {% if e.model_gb %}
