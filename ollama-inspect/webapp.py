@@ -289,11 +289,92 @@ def create_app() -> Flask:
             error=error,
         )
 
+    # --- Helpers to resolve blob filenames from model names (avoid duplication) ---
+    def _manifests_dir() -> Path:
+        home = Path.home()
+        return home / ".ollama" / "models" / "manifests" / "registry.ollama.ai" / "library"
+
+    def _derive_display_name(manifest_path: Path, manifest_obj: Dict[str, Any]) -> str:
+        name = manifest_obj.get("model") or manifest_obj.get("name") or manifest_path.stem
+        try:
+            parent_dir = manifest_path.parent.name
+            if parent_dir and not (
+                str(name).startswith(parent_dir + "/")
+                or str(name).startswith(parent_dir + ":")
+                or ("/" in str(name) and str(name).split("/", 1)[0] == parent_dir)
+            ):
+                return f"{parent_dir}/{name}"
+            return str(name)
+        except Exception:
+            return str(name)
+
+    def _media_type_for(kind: str) -> Optional[str]:
+        mapping = {
+            "model": "application/vnd.ollama.image.model",
+            "template": "application/vnd.ollama.image.template",
+            "license": "application/vnd.ollama.image.license",
+            "params": "application/vnd.ollama.image.params",
+        }
+        return mapping.get(kind)
+
+    def _resolve_blob_filename_by_model(model_name: str, kind: str) -> Tuple[Optional[str], Optional[str]]:
+        """Given a model display name and desired layer kind, return blob filename.
+
+        Returns (filename, error). Only one of them will be non-None.
+        """
+        mdir = _manifests_dir()
+        if not model_name:
+            return None, "Missing required 'model' parameter."
+        mt = _media_type_for(kind)
+        if mt is None:
+            return None, f"Unsupported kind: {kind}"
+        if not mdir.exists():
+            return None, f"Manifests directory not found: {mdir}"
+        target = model_name.strip()
+        try:
+            for mf in sorted(mdir.glob("**/*")):
+                if not mf.is_file():
+                    continue
+                try:
+                    with mf.open("r", encoding="utf-8") as f:
+                        manifest = json.load(f)
+                except Exception:
+                    continue
+                # Quickly ensure required structure exists
+                layers = manifest.get("layers") or []
+                if not isinstance(layers, list) or not layers:
+                    continue
+                display_name = _derive_display_name(mf, manifest)
+                if display_name == target:
+                    for layer in layers:
+                        if isinstance(layer, dict) and layer.get("mediaType") == mt:
+                            dg = layer.get("digest")
+                            if isinstance(dg, str):
+                                return digest_to_filename(dg), None
+                    # Found model but desired layer missing
+                    return None, f"Layer '{kind}' not found for model '{model_name}'."
+        except Exception as e:
+            return None, str(e)
+        return None, f"Model not found: {model_name}"
+
     @app.get("/model/metadata")
     def get_model_metadata():  # type: ignore[override]
         # Split into blobs root and filename passed as GET parameter
         filename = request.args.get("filename", type=str)
+        model = request.args.get("model", type=str)
         blobs_root = get_blobs_root()
+        if not filename and model:
+            # Resolve via manifest by model name
+            resolved, err = _resolve_blob_filename_by_model(model, "model")
+            if err:
+                return render_template(
+                    "model_metadata.html",
+                    model_path=str(blobs_root),
+                    items=[],
+                    keys_count=0,
+                    error=err,
+                )
+            filename = resolved
         if not filename:
             # Render a simple error page when filename is missing
             return render_template(
@@ -301,7 +382,7 @@ def create_app() -> Flask:
                 model_path=str(blobs_root),
                 items=[],
                 keys_count=0,
-                error="Missing required 'filename' parameter (expected like sha256-<hex>).",
+                error="Missing required 'filename' or 'model' parameter.",
             )
         # Normalize/validate filename
         fn = normalize_candidate_filename(filename)
@@ -403,11 +484,38 @@ def create_app() -> Flask:
     @app.get("/model/license")
     def get_model_license():  # type: ignore[override]
         filename = request.args.get("filename", type=str)
+        model = request.args.get("model", type=str)
+        if not filename and model:
+            resolved, err = _resolve_blob_filename_by_model(model, "license")
+            if err:
+                # Show error using text blob template context
+                return render_template(
+                    "text_blob.html",
+                    title="License",
+                    model_path=str(get_blobs_root()),
+                    filename=None,
+                    content="",
+                    error=err,
+                )
+            filename = resolved
         return _render_text_blob_page("License", filename)
 
     @app.get("/model/template")
     def get_model_template():  # type: ignore[override]
         filename = request.args.get("filename", type=str)
+        model = request.args.get("model", type=str)
+        if not filename and model:
+            resolved, err = _resolve_blob_filename_by_model(model, "template")
+            if err:
+                return render_template(
+                    "text_blob.html",
+                    title="Template",
+                    model_path=str(get_blobs_root()),
+                    filename=None,
+                    content="",
+                    error=err,
+                )
+            filename = resolved
         return _render_text_blob_page("Template", filename)
 
     @app.get("/model/params")
@@ -419,7 +527,20 @@ def create_app() -> Flask:
         permissive line-based `key: value` fallback parser.
         """
         filename = request.args.get("filename", type=str)
+        model = request.args.get("model", type=str)
         blobs_root = get_blobs_root()
+        if not filename and model:
+            resolved, err = _resolve_blob_filename_by_model(model, "params")
+            if err:
+                return render_template(
+                    "model_params.html",
+                    model_path=str(blobs_root),
+                    filename=None,
+                    params_items=[],
+                    params_count=0,
+                    error=err,
+                )
+            filename = resolved
         if not filename:
             return render_template(
                 "model_params.html",
@@ -427,7 +548,7 @@ def create_app() -> Flask:
                 filename=None,
                 params_items=[],
                 params_count=0,
-                error="Missing required 'filename' parameter (expected like sha256-<hex>).",
+                error="Missing required 'filename' or 'model' parameter.",
             )
         fn = normalize_candidate_filename(filename)
         if not is_valid_blob_filename(fn):
