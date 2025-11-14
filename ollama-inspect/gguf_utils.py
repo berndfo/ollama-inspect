@@ -120,6 +120,8 @@ def get_file_host_endian(reader: GGUFReader) -> tuple[str, str]:
         host_endian = file_endian
     return (host_endian, file_endian)
 
+console_log = False
+
 def extract_all(model_path: Path) -> Tuple[List[str], Dict[str, Any]]:
     """Open the GGUF file once and return (sorted_keys_list, values_dict).
 
@@ -139,8 +141,10 @@ def extract_all(model_path: Path) -> Tuple[List[str], Dict[str, Any]]:
         raise GGUFLoadError(f"Could not open GGUF file '{model_path}': {e}") from e
 
     host_endian, file_endian = get_file_host_endian(reader)
-    print(f'* File is {file_endian} endian, script is running on a {host_endian} endian host.')  # noqa: NP100
-    print(f'* Dumping {len(reader.fields)} key/value pair(s)')  # noqa: NP100
+    
+    if console_log:
+        print(f'* File is {file_endian} endian, script is running on a {host_endian} endian host.')  # noqa: NP100
+        print(f'* Dumping {len(reader.fields)} key/value pair(s)')  # noqa: NP100
     
     items: Dict[str, Any] = {}
     
@@ -168,7 +172,8 @@ def extract_all(model_path: Path) -> Tuple[List[str], Dict[str, Any]]:
                 if len(field.data) > 6:
                     content = content[:-1] + ', ...]'
                 log_message += ' = {0}'.format(content)
-        print(log_message)  # noqa: NP100
+        if console_log:
+            print(log_message)  # noqa: NP100
         
         # Populate items dict with full, properly typed values (not truncated like the log)
         try:
