@@ -1,7 +1,7 @@
 Ollama Inspect
 =================
 
-Minimal web UI to inspect the contents of locally cached Ollama models (GGUF) and related blobs on your machine.
+ollama-inspect is a minimalist web UI to inspect the contents of locally cached Ollama models (GGUF) and the related blobs on your machine.
 
 It scans your local Ollama directory (typically `~/.ollama/models`) and lets you:
 
@@ -11,13 +11,13 @@ It scans your local Ollama directory (typically `~/.ollama/models`) and lets you
 - Open the model template, license text, and parameter presets (if present)
 - Query a small JSON API to get keys or items programmatically
 
-
 Contents
 --------
 - What is this?
 - Requirements
 - Installation
 - Quick start
+- Screenshots
 - How it finds your models
 - Using the web UI
 - API endpoints
@@ -27,7 +27,7 @@ Contents
 
 What is this?
 -------------
-When you pull models with [Ollama](https://ollama.com), it stores model manifests and binary blobs (GGUF, templates, licenses, params) under your user home directory. This tool runs a small local Flask server that reads those files and shows a compact, searchable view in your browser. It never uploads your files anywhere.
+When you pull models with [Ollama](https://ollama.com), it stores model manifests and binary blobs (GGUF, templates, licenses, params) under your user home directory. This tool runs a small local webserver that reads those files and shows a compact, searchable view in your browser. All access to your files is read-only.
 
 
 Requirements
@@ -83,6 +83,18 @@ Notes
 - `--port` defaults to `13655`.
 
 
+Screenshots
+-----------
+
+Home page — models overview
+
+![Home page — models overview](./ollama-inspect-overview.png)
+
+Model metadata — key/value view
+
+![Model metadata — key/value view](./ollama-inspect-keyvalues.png)
+
+
 How it finds your models
 ------------------------
 By default the app looks under your user home directory, using the same structure as Ollama:
@@ -91,7 +103,6 @@ By default the app looks under your user home directory, using the same structur
 - Blobs: `~/.ollama/models/blobs/` (files named like `sha256-<hex>`)
 
 The home page reads all valid manifests it finds and shows one entry per manifest. It also derives the expected blob filenames from the manifests and checks whether those blobs are present under `blobs/`.
-
 
 Using the web UI
 ----------------
