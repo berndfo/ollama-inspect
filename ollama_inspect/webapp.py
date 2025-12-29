@@ -5,8 +5,8 @@ from typing import Any, Dict, List, Tuple, Optional
 
 from flask import Flask, jsonify, render_template, request
 
-from gguf_utils import GGUFLoadError, extract_all
-from path_utils import (
+from .gguf_utils import GGUFLoadError, extract_all
+from .path_utils import (
     get_blobs_root,
     normalize_candidate_filename,
     is_valid_blob_filename,
