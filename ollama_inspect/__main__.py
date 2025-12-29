@@ -3,7 +3,7 @@
 Ollama Inspect — minimal GGUF inspector web server.
 
 Usage:
-  python main.py /path/to/your_model.gguf [--host 127.0.0.1] [--port 13655]
+  python -m ollama_inspect /path/to/your_model.gguf [--host 127.0.0.1] [--port 13655]
 
 Starts a local web server that displays the keys extracted from the GGUF file.
 """
@@ -42,12 +42,14 @@ def _die(msg: str, code: int = 1) -> "None":
     sys.exit(code)
 
 
-def main(argv: list[str]) -> int:
+def main(argv: list[str] = None) -> int:
+    if argv is None:
+        argv = sys.argv
     host, port = _parse_args(argv)
 
     # Import here to keep main module lightweight for other tooling
     try:
-        from webapp import create_app  # type: ignore
+        from .webapp import create_app
     except Exception as e:
         _die(f"Failed to import web application components: {e}")
 

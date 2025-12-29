@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ollama-inspect"
+version = "0.1.1"
+description = "Ollama Inspect — minimal GGUF inspector web server"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+authors = [
+  { name = "Bernd Fondermann", email = "python@brainlounge.de" },
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "flask>=3.0.0",
+    "gguf>=0.10.0",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/brainlounge/ollama-inspect"
+
+[project.scripts]
+ollama-inspect = "ollama_inspect:main"
+
+[tool.setuptools]
+packages = ["ollama_inspect"]
+
+[tool.setuptools.package-data]
+ollama_inspect = ["templates/*"]
