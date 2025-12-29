@@ -32,44 +32,46 @@ When you pull models with [Ollama](https://ollama.com), it stores model manifest
 
 Requirements
 ------------
-- Python 3.10 or newer
-- pip (or another package manager)
+- Python 3.8 or newer
 - Locally installed Ollama with one or more downloaded models (optional but recommended)
 
-Python dependencies are listed in `requirements.txt`:
-- Flask (web server)
-- gguf (for reading GGUF metadata)
+Dependencies (automatically installed):
+- Flask
+- gguf
 
 
 Installation
 ------------
-1) Clone this repository
+
+### From PyPI
 
 ```
-git clone https://github.com/berndfo/ollama-inspect.git
+pip install ollama-inspect
+```
+
+### From Source
+
+```
+git clone https://github.com/brainlounge/ollama-inspect.git
 cd ollama-inspect
-```
-
-2) (Recommended) Create and activate a virtual environment
-
-```
-python3 -m venv .venv
-source .venv/bin/activate  # on Windows: .venv\Scripts\activate
-```
-
-3) Install dependencies
-
-```
-pip install -r requirements.txt
+pip install .
 ```
 
 
-Quick start
------------
+Usage
+-----
 Run the local server:
 
 ```
-python main.py --host 127.0.0.1 --port 13655
+ollama-inspect
+# or
+python -m ollama_inspect
+```
+
+You can specify host and port:
+
+```
+ollama-inspect --host 0.0.0.0 --port 8080
 ```
 
 Then open your browser at:
@@ -182,7 +184,7 @@ Troubleshooting
   - Confirm the referenced `filename` actually points to a GGUF model blob
 
 - Port is already in use
-  - Start the app with another port: `python main.py --port 13656`
+  - Start the app with another port: `ollama-inspect --port 13656`
 
 - Windows paths
   - The app uses your user home directory; the equivalent of `~/.ollama` is typically `C:\\Users\\<you>\\.ollama`
@@ -190,13 +192,13 @@ Troubleshooting
 
 Development
 -----------
-- Code entrypoint: `main.py` launches the Flask app defined in `webapp.py`
+- Code entrypoint: `ollama_inspect/__main__.py` launches the Flask app defined in `webapp.py`
 - HTML templates live in `templates/`
 - Path helpers are in `path_utils.py`
 - GGUF extraction helpers are in `gguf_utils.py`
 
 Run locally with auto‑reload (optional)
-- You can enable Flask debug mode by changing the `debug` flag in `main.py` (for local development only). Do not enable debug in production.
+- You can enable Flask debug mode by changing the `debug` flag in `ollama_inspect/__main__.py` (for local development only). Do not enable debug in production.
 
 Formatting & style
 - The codebase uses standard Python typing and a lightweight, dependency‑minimal approach. Please keep changes small and focused.
@@ -216,4 +218,4 @@ This project is licensed under the Apache License, Version 2.0.
 - SPDX-License-Identifier: Apache-2.0
 - See the LICENSE file in this repository for the full license text.
 
-Copyright (c) 2025 Brainlounge and contributors
+Copyright (c) 2025 Bernd Fondermann and contributors
